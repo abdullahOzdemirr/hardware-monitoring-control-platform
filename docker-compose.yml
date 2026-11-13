@@ -1,0 +1,42 @@
+networks:
+  modbus-net:
+    driver: bridge
+
+services:
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: modbus-simulator
+    ports:
+      - "5020:5020"
+    stdin_open: true
+    tty: true
+    networks:
+      - modbus-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: modbus-backend
+    ports:
+      - "8080:8080" # opsiyonel
+    depends_on:
+      - simulator
+    stdin_open: true
+    tty: true
+    networks:
+      - modbus-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: modbus-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - modbus-net

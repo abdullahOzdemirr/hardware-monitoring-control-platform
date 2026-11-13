@@ -1,0 +1,15 @@
+{
+  "device_url": "tcp://192.168.1.50:502",
+  "relays": [
+    {
+      "id": 0,
+      "name": "Ana Motor Rölesi",
+      "coil_address": 0
+    },
+    {
+      "id": 1,
+      "name": "Soğutma Fanı",
+      "coil_address": 1
+    }
+  ]
+}
