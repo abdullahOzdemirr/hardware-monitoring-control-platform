@@ -53,26 +53,10 @@ Sistemde cihaz ve röle bazlı granüler yetkilendirme uygulanmaktadır. Django 
 
 | Yetki Kodu (Permission) | Açıklama | Etki Alanı |
 | --- | --- | --- |
-| `device1_relay1_change`
-
- | Cihaz 1 - Röle 1 Durumunu Değiştirebilir
-
- | Kazan Dairesi PLC-1 (Ana Isıtıcı) |
-| `device1_relay2_change`
-
- | Cihaz 1 - Röle 2 Durumunu Değiştirebilir
-
- | Kazan Dairesi PLC-1 (Sirkülasyon Pompası) |
-| `device2_relay1_change`
-
- | Cihaz 2 - Röle 1 Durumunu Değiştirebilir
-
- | Soğuk Hava Deposu PLC-2 (Kompresör) |
-| `device2_relay2_change`
-
- | Cihaz 2 - Röle 2 Durumunu Değiştirebilir
-
- | Soğuk Hava Deposu PLC-2 (Fan Grubu 1) |
+| `device1_relay1_change` | Cihaz 1 - Röle 1 Durumunu Değiştirebilir | Kazan Dairesi PLC-1 (Ana Isıtıcı) |
+| `device1_relay2_change` | Cihaz 1 - Röle 2 Durumunu Değiştirebilir | Kazan Dairesi PLC-1 (Sirkülasyon Pompası) |
+| `device2_relay1_change` | Cihaz 2 - Röle 1 Durumunu Değiştirebilir | Soğuk Hava Deposu PLC-2 (Kompresör) |
+| `device2_relay2_change` | Cihaz 2 - Röle 2 Durumunu Değiştirebilir | Soğuk Hava Deposu PLC-2 (Fan Grubu 1) |
 
 ---
 
