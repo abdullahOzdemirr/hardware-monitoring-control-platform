@@ -3,7 +3,7 @@
     {
       "id": 1,
       "name": "Kazan Dairesi PLC-1",
-      "url": "tcp://modbus-simulator-1:5020",
+      "url": "tcp://simulator:5020",
       "sensors": [
         { "name": "Sıcaklık", "address": 0, "unit": "°C" },
         { "name": "Nem", "address": 1, "unit": "%" }
@@ -16,7 +16,7 @@
     {
       "id": 2,
       "name": "Soğuk Hava Deposu PLC-2",
-      "url": "tcp://modbus-simulator-2:5020",
+      "url": "tcp://simulator:5020",
       "sensors": [
         { "name": "Ortam Sıcaklığı", "address": 0, "unit": "°C" }
       ],

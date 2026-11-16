@@ -43,7 +43,7 @@ Platform, izole bir Docker ağı (`modbus-net`) üzerinde çalışan birbirine e
 * **Modbus TCP Simülatörü (`simulator`):** Saha PLC donanımlarını (Kazan Dairesi PLC-1, Soğuk Hava Deposu PLC-2) simüle eden sanal sunucular.
 * **Gözlemlenebilirlik Yığını (`prometheus` & `grafana`):** Modbus bağlantı durumlarını, okuma gecikme sürelerini, röle tetiklenme sayaçlarını ve HTTP istek trafiğini gerçek zamanlı olarak izler.
 
-*(Not: Cihaz, sensör ve röle adres haritaları proje dizinindeki `configs/config.json` dosyasında tanımlıdır.)*
+*(Not: Cihaz, sensör ve röle adres haritaları proje dizinindeki `configs/config.json.example` dosyasında tanımlıdır.)*
 
 ---
 
