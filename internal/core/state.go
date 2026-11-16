@@ -1,40 +1,49 @@
 package core
 
 import (
-	"sync"
-
 	"hardware-monitoring-control-platform/internal/client"
+	"sync"
 )
 
-// konfigürasyon dosyasından okunan röle kanal parametrelerini tanımlama.
+type SensorConfig struct {
+	Name    string `json:"name"`
+	Address uint16 `json:"address"`
+	Unit    string `json:"unit"`
+}
+
 type RelayConfig struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	CoilAddress uint16 `json:"coil_address"`
 }
 
-// tüm sistem konfigürasyon yapısını temsil etme.
-type Config struct {
-	DeviceURL string        `json:"device_url"`
-	Relays    []RelayConfig `json:"relays"`
+type DeviceConfig struct {
+	ID      int            `json:"id"`
+	Name    string         `json:"name"`
+	URL     string         `json:"url"`
+	Sensors []SensorConfig `json:"sensors"`
+	Relays  []RelayConfig  `json:"relays"`
 }
 
-// eşzamanlı çalışan goroutine'ler arası veri paylaşımını ve donanım state'ini yönetme.
+type Config struct {
+	Devices []DeviceConfig `json:"devices"`
+}
+
 type ServerState struct {
-	AppConfig   Config
-	SafeClient  *client.SafeClient
-	LatestTemp  float64
-	LatestHum   float64
-	DataMu      sync.RWMutex
-	RelayStates map[int]bool
+	AppConfig Config
+
+	Clients  map[int]*client.SafeClient
+	ClientMu sync.RWMutex
+
+	DeviceSensors map[int]map[uint16]float64
+	DataMu        sync.RWMutex
+
+	RelayStates map[int]map[int]bool
 	RelayMu     sync.Mutex
 }
 
-func (s *ServerState) CanOperate() bool {
-	ac := s.SafeClient.Get()
-	if ac == nil {
-		return false
-	}
-	// buraya acil stop, bakım modu vb. ek iş kuralları ekleyelim.
-	return true
+func (s *ServerState) GetClient(deviceID int) *client.SafeClient {
+	s.ClientMu.RLock()
+	defer s.ClientMu.RUnlock()
+	return s.Clients[deviceID]
 }

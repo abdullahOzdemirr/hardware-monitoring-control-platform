@@ -2,25 +2,28 @@ package api
 
 import (
 	"encoding/json"
+	"hardware-monitoring-control-platform/internal/core"
 	"net/http"
 	"time"
-
-	"hardware-monitoring-control-platform/internal/core"
 )
 
-// anlık sıcaklık ve nem verilerini HTTP üzerinden servis etme.
 func HandleGetSensors(state *core.ServerState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		state.DataMu.RLock()
-		temp := state.LatestTemp
-		hum := state.LatestHum
+		// race condition'ı önlemek için
+		sensorsCopy := make(map[int]map[uint16]float64)
+		for dID, sMap := range state.DeviceSensors {
+			sensorsCopy[dID] = make(map[uint16]float64)
+			for addr, val := range sMap {
+				sensorsCopy[dID][addr] = val
+			}
+		}
 		state.DataMu.RUnlock()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"temperature": temp,
-			"humidity":    hum,
-			"timestamp":   time.Now().Format("15:04:05"),
+			"devices":   sensorsCopy,
+			"timestamp": time.Now().Format("15:04:05"),
 		})
 	}
 }

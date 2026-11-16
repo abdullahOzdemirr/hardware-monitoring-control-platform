@@ -10,6 +10,6 @@ func NewModbusServer(url string, handler *SensorHandler) (*modbus.ModbusServer, 
 	return modbus.NewServer(&modbus.ServerConfiguration{
 		URL:        url,
 		Timeout:    30 * time.Second,
-		MaxClients: 5,
+		MaxClients: 1,
 	}, handler)
 }

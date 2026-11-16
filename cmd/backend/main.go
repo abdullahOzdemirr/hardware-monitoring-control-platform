@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"hardware-monitoring-control-platform/internal/api"
 	"hardware-monitoring-control-platform/internal/client"
 	"hardware-monitoring-control-platform/internal/core"
@@ -18,6 +20,10 @@ import (
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env dosyası okunamadı!")
+	}
+
 	file, err := os.ReadFile("configs/config.json")
 	if err != nil {
 		log.Fatalf("Konfigürasyon dosyası okunamadı: %v", err)
@@ -28,16 +34,26 @@ func main() {
 		log.Fatalf("JSON parse hatası: %v", err)
 	}
 
+	clients := make(map[int]*client.SafeClient)
+	deviceSensors := make(map[int]map[uint16]float64)
+	relayStates := make(map[int]map[int]bool)
+
+	for _, dev := range cfg.Devices {
+		clients[dev.ID] = &client.SafeClient{}
+		relayStates[dev.ID] = make(map[int]bool)
+	}
+
 	state := &core.ServerState{
-		AppConfig:   cfg,
-		SafeClient:  &client.SafeClient{},
-		RelayStates: make(map[int]bool),
+		AppConfig:     cfg,
+		Clients:       clients,
+		DeviceSensors: deviceSensors,
+		RelayStates:   relayStates,
 	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	fmt.Println("Çoklu Cihaz Backend servisleri başlatılıyor...")
 
-	fmt.Println("Backend servisleri başlatılıyor...")
 	done := make(chan struct{})
 	var wg sync.WaitGroup
 
@@ -52,14 +68,14 @@ func main() {
 		}
 	}()
 
-	// 2. Modbus Polling Servisini Başlat
+	// 2. Çoklu Cihaz Modbus Polling Servisini Başlat
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		poller.StartPoller(state, done)
 	}()
 
-	// 3. Terminal CLI Servisini Başlat (React var ama bura test amaçlı)
+	// 3. Terminal CLI Servisini Başlat
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

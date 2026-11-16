@@ -1,10 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.tsx';
+import { AuthProvider } from './context/AuthContext'; // <-- AuthProvider'ı içe aktarıyoruz
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AuthProvider> {/* <-- App bileşenini AuthProvider ile sarmaladık */}
+      <App />
+    </AuthProvider>
   </React.StrictMode>,
-)
+);

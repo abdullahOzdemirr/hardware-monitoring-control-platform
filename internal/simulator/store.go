@@ -9,19 +9,77 @@ import (
 	"github.com/simonvetter/modbus"
 )
 
-type SensorHandler struct {
-	Mu          sync.RWMutex
-	Temperature uint16
-	Humidity    uint16
-	Coils       [4]bool
-	FaultMode   string // "normal", "timeout", "error"
+// Config Yapıları
+type SensorConfig struct {
+	Name    string `json:"name"`
+	Address uint16 `json:"address"`
+	Unit    string `json:"unit"`
 }
 
-func NewSensorHandler() *SensorHandler {
+type RelayConfig struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	CoilAddress uint16 `json:"coil_address"`
+}
+
+type DeviceConfig struct {
+	ID      int            `json:"id"`
+	Name    string         `json:"name"`
+	URL     string         `json:"url"`
+	Sensors []SensorConfig `json:"sensors"`
+	Relays  []RelayConfig  `json:"relays"`
+}
+
+type Config struct {
+	Devices []DeviceConfig `json:"devices"`
+}
+
+type SensorHandler struct {
+	Mu         sync.RWMutex
+	DeviceName string
+	Sensors    map[uint16]uint16 // Adres -> Değer
+	Coils      map[uint16]bool   // Coil Adresi -> Durum (Açık/Kapalı)
+	FaultMode  string            // "normal", "timeout", "error"
+}
+
+func NewSensorHandler(deviceName string, sensors []SensorConfig, relays []RelayConfig) *SensorHandler {
+	sensorMap := make(map[uint16]uint16)
+
+	// Başlangıç değerleri
+	for _, s := range sensors {
+		switch s.Address {
+		case 0:
+			sensorMap[s.Address] = 2450
+		case 1:
+			sensorMap[s.Address] = 5500
+		default:
+			sensorMap[s.Address] = 1000
+		}
+	}
+
+	coilMap := make(map[uint16]bool)
+	for _, r := range relays {
+		coilMap[r.CoilAddress] = false
+	}
+
 	return &SensorHandler{
-		Temperature: 2450,
-		Humidity:    5500,
-		FaultMode:   "normal",
+		DeviceName: deviceName,
+		Sensors:    sensorMap,
+		Coils:      coilMap,
+		FaultMode:  "normal",
+	}
+}
+
+func (h *SensorHandler) UpdateRandomValues() {
+	h.Mu.Lock()
+	defer h.Mu.Unlock()
+	for addr := range h.Sensors {
+		val := int16(h.Sensors[addr])
+		val += int16(rand.Intn(41) - 20)
+		if val < 0 {
+			val = 0
+		}
+		h.Sensors[addr] = uint16(val)
 	}
 }
 
@@ -31,12 +89,12 @@ func (h *SensorHandler) HandleInputRegisters(req *modbus.InputRegistersRequest) 
 	h.Mu.RUnlock()
 
 	if mode == "timeout" {
-		fmt.Println("[Simülatör] İstek kasıtlı olarak geciktiriliyor...")
+		fmt.Printf("[%s] İstek kasıtlı olarak geciktiriliyor...\n", h.DeviceName)
 		time.Sleep(3 * time.Second)
 	}
 
 	if mode == "error" {
-		fmt.Println("[Simülatör] Kasıtlı hata yanıtı döndürülüyor.")
+		fmt.Printf("[%s] Kasıtlı hata yanıtı döndürülüyor.\n", h.DeviceName)
 		return nil, modbus.ErrIllegalDataAddress
 	}
 
@@ -46,14 +104,11 @@ func (h *SensorHandler) HandleInputRegisters(req *modbus.InputRegistersRequest) 
 	var res []uint16
 	for i := uint16(0); i < req.Quantity; i++ {
 		addr := req.Addr + i
-		switch addr {
-		case 0:
-			res = append(res, h.Temperature)
-		case 1:
-			res = append(res, h.Humidity)
-		default:
+		val, exists := h.Sensors[addr]
+		if !exists {
 			return nil, modbus.ErrIllegalDataAddress
 		}
+		res = append(res, val)
 	}
 	return res, nil
 }
@@ -65,30 +120,35 @@ func (h *SensorHandler) HandleCoils(req *modbus.CoilsRequest) ([]bool, error) {
 	if req.IsWrite {
 		for i := uint16(0); i < req.Quantity; i++ {
 			addr := req.Addr + i
-			if addr >= 4 {
+			_, exists := h.Coils[addr]
+			if !exists {
 				return nil, modbus.ErrIllegalDataAddress
 			}
 			targetVal := req.Args[0]
+
+			// Donanımda arıza çıkma simülasyonu (%30 ihtimalle adres 1 takılır)
 			if addr == 1 && rand.Float32() < 0.3 {
-				fmt.Printf("[Simülatör Donanım Arızası] Isıtıcı rölesi mekanik olarak sıkıştı, komut uygulanamadı!\n")
+				fmt.Printf("[%s - Donanım Arızası] Röle adresi #%d mekanik olarak sıkıştı, komut uygulanamadı!\n", h.DeviceName, addr)
 				continue
 			}
+
 			h.Coils[addr] = targetVal
 			stateStr := "KAPATILDI (False)"
 			if targetVal {
 				stateStr = "AÇILDI (True)"
 			}
-			fmt.Printf("[Simülatör Fiziksel Donanım] Röle Kanalı #%d -> %s\n", addr, stateStr)
+			fmt.Printf("[%s - Fiziksel Donanım] Röle Adresi #%d -> %s\n", h.DeviceName, addr, stateStr)
 		}
 	}
 
 	var res []bool
 	for i := uint16(0); i < req.Quantity; i++ {
 		addr := req.Addr + i
-		if addr >= 4 {
+		val, exists := h.Coils[addr]
+		if !exists {
 			return nil, modbus.ErrIllegalDataAddress
 		}
-		res = append(res, h.Coils[addr])
+		res = append(res, val)
 	}
 	return res, nil
 }

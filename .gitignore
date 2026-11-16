@@ -1,3 +1,10 @@
 configs/config.json
-
+.env
 frontend/node_modules/
+docker-compose.yml
+Dockerfile.backend
+Dockerfile.simulator
+prometheus.yml
+internal/metrics
+django_auth/Dockerfile
+frontend/Dockerfile.frontend

@@ -1,15 +1,29 @@
 {
-  "device_url": "tcp://192.168.1.50:502",
-  "relays": [
-    {
-      "id": 0,
-      "name": "Ana Motor Rölesi",
-      "coil_address": 0
-    },
+  "devices": [
     {
       "id": 1,
-      "name": "Soğutma Fanı",
-      "coil_address": 1
+      "name": "Kazan Dairesi PLC-1",
+      "url": "tcp://modbus-simulator-1:5020",
+      "sensors": [
+        { "name": "Sıcaklık", "address": 0, "unit": "°C" },
+        { "name": "Nem", "address": 1, "unit": "%" }
+      ],
+      "relays": [
+        { "id": 1, "name": "Ana Isıtıcı", "coil_address": 0 },
+        { "id": 2, "name": "Sirkülasyon Pompası", "coil_address": 1 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Soğuk Hava Deposu PLC-2",
+      "url": "tcp://modbus-simulator-2:5020",
+      "sensors": [
+        { "name": "Ortam Sıcaklığı", "address": 0, "unit": "°C" }
+      ],
+      "relays": [
+        { "id": 1, "name": "Kompresör", "coil_address": 0 },
+        { "id": 2, "name": "Fan Grubu", "coil_address": 1 }
+      ]
     }
   ]
 }

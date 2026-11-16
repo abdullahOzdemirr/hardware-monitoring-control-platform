@@ -1,17 +1,50 @@
-networks:
-  modbus-net:
-    driver: bridge
-
 services:
+  # 1. PostgreSQL Veritabanı Servisi (Django İçin)
+  db:
+    image: postgres:15-alpine
+    container_name: scada-postgres-db
+    environment:
+      POSTGRES_DB: authDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: siraBende04
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - modbus-net
+
   simulator:
     build:
       context: .
       dockerfile: Dockerfile.simulator
-    container_name: modbus-simulator
+    container_name: modbus-simulator-hub
     ports:
-      - "5020:5020"
+      - "5020-5030:5020-5030"
+    volumes:
+      - ./configs:/app/configs
     stdin_open: true
     tty: true
+    networks:
+      - modbus-net
+
+  django-auth:
+    build:
+      context: ./django_auth
+      dockerfile: Dockerfile
+    container_name: django_auth_service
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./django_auth:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=proje_veritabani
+      - DB_USER=kullanici
+      - DB_PASSWORD=sifre
+    depends_on:
+      - db
     networks:
       - modbus-net
 
@@ -21,11 +54,37 @@ services:
       dockerfile: Dockerfile.backend
     container_name: modbus-backend
     ports:
-      - "8080:8080" # opsiyonel
+      - "8080:8080"
     depends_on:
       - simulator
+      - django-auth
     stdin_open: true
     tty: true
+    networks:
+      - modbus-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - modbus-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
     networks:
       - modbus-net
 
@@ -40,3 +99,10 @@ services:
       - backend
     networks:
       - modbus-net
+
+volumes:
+  postgres_data:
+
+networks:
+  modbus-net:
+    driver: bridge

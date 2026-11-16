@@ -3,17 +3,15 @@ package poller
 import (
 	"bufio"
 	"fmt"
+	"hardware-monitoring-control-platform/internal/core"
 	"os"
 	"strings"
 	"time"
-
-	"hardware-monitoring-control-platform/internal/core"
 )
 
-// terminal girişlerini dinleyerek anlık röle kontrol komutlarını işler.
 func StartCLI(state *core.ServerState, done chan<- struct{}) {
-	time.Sleep(500 * time.Millisecond) // Logların çakışmaması için kısa gecikme
-	fmt.Print("\n[CLI Aktif] Röle komutu için örnek: '0 1' (Aç) veya '0 0' (Kapat). Çıkış için 'exit'\n> ")
+	time.Sleep(500 * time.Millisecond)
+	fmt.Print("\n[CLI Aktif] Format: '<CihazID> <RoleID> <Deger>' (Örn: '1 1 1' -> Cihaz 1, Röle 1, Aç). Çıkış için 'exit'\n> ")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -23,17 +21,29 @@ func StartCLI(state *core.ServerState, done chan<- struct{}) {
 			return
 		}
 
-		var relayID int
-		var stateInt int
-		_, err := fmt.Sscanf(text, "%d %d", &relayID, &stateInt)
+		var deviceID, relayID, stateInt int
+		_, err := fmt.Sscanf(text, "%d %d %d", &deviceID, &relayID, &stateInt)
 		if err != nil {
-			fmt.Println("Geçersiz format! Örnek: '0 1' (Aç) veya '0 0' (Kapat)")
+			fmt.Println("Geçersiz format! Örnek: '1 1 1' (Cihaz 1, Röle 1, Aç)")
 			fmt.Print("> ")
 			continue
 		}
 
+		var targetDevice *core.DeviceConfig
+		for _, d := range state.AppConfig.Devices {
+			if d.ID == deviceID {
+				targetDevice = &d
+				break
+			}
+		}
+
+		if targetDevice == nil {
+			fmt.Printf("Hata: ID'si %d olan cihaz bulunamadı!\n> ", deviceID)
+			continue
+		}
+
 		var targetRelay *core.RelayConfig
-		for _, r := range state.AppConfig.Relays {
+		for _, r := range targetDevice.Relays {
 			if r.ID == relayID {
 				targetRelay = &r
 				break
@@ -41,41 +51,42 @@ func StartCLI(state *core.ServerState, done chan<- struct{}) {
 		}
 
 		if targetRelay == nil {
-			fmt.Printf("Hata: ID'si %d olan röle bulunamadı!\n> ", relayID)
+			fmt.Printf("Hata: %s cihazında ID'si %d olan röle bulunamadı!\n> ", targetDevice.Name, relayID)
 			continue
 		}
 
 		targetState := (stateInt == 1)
-
-		if !state.CanOperate() {
-			fmt.Println("Hata: Şu anda aktif bir Modbus bağlantısı yok!\n> ")
+		safeClient := state.GetClient(deviceID)
+		if safeClient == nil || safeClient.Get() == nil {
+			fmt.Println("Hata: Bu cihaz için aktif bir Modbus bağlantısı yok!\n> ")
 			continue
 		}
 
-		ac := state.SafeClient.Get()
-
-		state.SafeClient.Mu.Lock()
+		ac := safeClient.Get()
+		safeClient.Mu.Lock()
 		err = ac.WriteCoil(targetRelay.CoilAddress, targetState)
 		if err != nil {
 			fmt.Printf("[YAZMA HATASI] Komut iletilemedi: %v\n> ", err)
-			state.SafeClient.Mu.Unlock()
+			safeClient.Mu.Unlock()
 			continue
 		}
 
 		actualState, err := ac.ReadCoils(targetRelay.CoilAddress, 1)
-		state.SafeClient.Mu.Unlock()
+		safeClient.Mu.Unlock()
 
 		if err != nil {
 			fmt.Printf("[READ-BACK HATASI]: %v\n> ", err)
 		} else if actualState[0] == targetState {
 			state.RelayMu.Lock()
-			state.RelayStates[relayID] = targetState
+			if state.RelayStates[deviceID] == nil {
+				state.RelayStates[deviceID] = make(map[int]bool)
+			}
+			state.RelayStates[deviceID][relayID] = targetState
 			state.RelayMu.Unlock()
-			fmt.Printf("[ANLIK KONTROL BAŞARILI] '%s' -> %v (Fiziksel olarak doğrulandı)\n> ", targetRelay.Name, targetState)
+			fmt.Printf("[BAŞARILI] %s -> '%s' -> %v\n> ", targetDevice.Name, targetRelay.Name, targetState)
 		} else {
 			fmt.Printf("[DONANIM ALARMI] '%s' durum değiştirilemedi!\n> ", targetRelay.Name)
 		}
-
 		fmt.Print("> ")
 	}
 }

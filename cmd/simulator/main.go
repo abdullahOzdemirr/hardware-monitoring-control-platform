@@ -2,9 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,62 +16,96 @@ import (
 )
 
 func main() {
-	handler := simulator.NewSensorHandler()
-
-	server, err := simulator.NewModbusServer("tcp://0.0.0.0:5020", handler)
+	file, err := os.ReadFile("configs/config.json")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Konfigürasyon dosyası okunamadı: %v", err)
 	}
 
-	if err := server.Start(); err != nil {
-		log.Fatal(err)
+	var cfg simulator.Config
+	if err := json.Unmarshal(file, &cfg); err != nil {
+		log.Fatalf("JSON parse hatası: %v", err)
 	}
-	defer server.Stop()
 
-	fmt.Println("Sanal Sensör ve Röle Kartı Çalışıyor -> tcp://0.0.0.0:5020")
+	fmt.Println("--- Çoklu Modbus Simülatör Merkezi Başlatılıyor ---")
 	fmt.Println("---------------------------------------------------------")
-	fmt.Println("HATA ENJEKSİYON KOMUTLARI:")
+	fmt.Println("HATA ENJEKSİYON KOMUTLARI (Tüm cihazlara uygulanır):")
 	fmt.Println("   [n] Normal mod (Veriler normal akar)")
 	fmt.Println("   [t] Timeout modu (Yanıt geciktirilir)")
 	fmt.Println("   [e] Hata modu (Modbus hata kodu döndürülür)")
 	fmt.Println("   [q] Çıkış")
 	fmt.Println("---------------------------------------------------------")
 
-	go func() {
-		for {
-			time.Sleep(2 * time.Second)
-			handler.Mu.Lock()
-			handler.Temperature = uint16(int16(handler.Temperature) + int16(rand.Intn(41)-20))
-			handler.Humidity = uint16(int16(handler.Humidity) + int16(rand.Intn(61)-30))
-			handler.Mu.Unlock()
-		}
-	}()
+	var handlers []*simulator.SensorHandler
 
+	for _, dev := range cfg.Devices {
+		handler := simulator.NewSensorHandler(dev.Name, dev.Sensors, dev.Relays)
+		handlers = append(handlers, handler)
+
+		listenURL := getListenURL(dev.URL)
+
+		server, err := simulator.NewModbusServer(listenURL, handler)
+		if err != nil {
+			log.Fatalf("[%s] Modbus sunucusu oluşturulamadı: %v", dev.Name, err)
+		}
+
+		go func(deviceName, targetURL string) {
+			if err := server.Start(); err != nil {
+				log.Fatalf("[%s] Sunucu başlatılamadı (%s): %v", deviceName, targetURL, err)
+			}
+		}(dev.Name, listenURL)
+
+		fmt.Printf("✔ %s Aktif -> Dinleniyor: %s (Tanımlı URL: %s)\n", dev.Name, listenURL, dev.URL)
+
+		go func(h *simulator.SensorHandler) {
+			for {
+				time.Sleep(2 * time.Second)
+				h.UpdateRandomValues()
+			}
+		}(handler)
+	}
+
+	// Konsoldan durumu değiştirme
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			cmd := strings.TrimSpace(strings.ToLower(scanner.Text()))
-			handler.Mu.Lock()
-			switch cmd {
-			case "n":
-				handler.FaultMode = "normal"
-				fmt.Println("\nMod: NORMAL (Veriler normal akıyor)")
-			case "t":
-				handler.FaultMode = "timeout"
-				fmt.Println("\nMod: TIMEOUT (İstekler geciktiriliyor)")
-			case "e":
-				handler.FaultMode = "error"
-				fmt.Println("\nMod: HATA (Geçersiz yanıtlar üretiliyor)")
-			case "q":
-				fmt.Println("Çıkış yapılıyor...")
-				os.Exit(0)
+			for _, h := range handlers {
+				h.Mu.Lock()
+				switch cmd {
+				case "n":
+					h.FaultMode = "normal"
+					fmt.Printf("\n[%s] Mod: NORMAL\n", h.DeviceName)
+				case "t":
+					h.FaultMode = "timeout"
+					fmt.Printf("\n[%s] Mod: TIMEOUT\n", h.DeviceName)
+				case "e":
+					h.FaultMode = "error"
+					fmt.Printf("\n[%s] Mod: HATA\n", h.DeviceName)
+				case "q":
+					fmt.Println("Çıkış yapılıyor...")
+					os.Exit(0)
+				}
+				h.Mu.Unlock()
 			}
-			handler.Mu.Unlock()
 		}
 	}()
 
+	// CTRL+C
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
-	fmt.Println("\nSimülatör kapatıldı.")
+	fmt.Println("\nTüm simülatörler kapatıldı.")
+}
+
+func getListenURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "tcp://0.0.0.0:5020"
+	}
+	parts := strings.Split(u.Host, ":")
+	port := "5020"
+	if len(parts) > 1 {
+		port = parts[1]
+	}
+	return fmt.Sprintf("tcp://0.0.0.0:%s", port)
 }
