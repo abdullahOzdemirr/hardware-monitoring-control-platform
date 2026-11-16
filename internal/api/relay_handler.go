@@ -139,7 +139,6 @@ func HandlePostRelay(state *core.ServerState) http.HandlerFunc {
 			return
 		}
 
-		// State güncelleme
 		state.RelayMu.Lock()
 		if state.RelayStates[req.DeviceID] == nil {
 			state.RelayStates[req.DeviceID] = make(map[int]bool)

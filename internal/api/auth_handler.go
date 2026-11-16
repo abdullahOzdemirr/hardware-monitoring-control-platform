@@ -12,7 +12,7 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// HandleLoginProxy, kullanıcı giriş isteklerini Django'ya yönlendirir
+// kullanıcı giriş isteklerini Django'ya yönlendirme
 func HandleLoginProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "İzin verilmeyen HTTP metodu", http.StatusMethodNotAllowed)
@@ -25,9 +25,10 @@ func HandleLoginProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Django servisinin URL'si (Docker Compose kullanıyorsan servis adıyla yazılabilir)
-	// Django servisinin URL'si (Yerel test için)
-	djangoURL := "http://127.0.0.1:8000/api/auth/login/"
+	//docker ile çalıştırılmayacaksa;
+	//djangoURL := "http://127.0.0.1:8000/api/auth/login/"
+
+	djangoURL := "http://django-auth:8000/api/auth/login/"
 
 	jsonData, _ := json.Marshal(req)
 	resp, err := http.Post(djangoURL, "application/json", bytes.NewBuffer(jsonData))
@@ -37,7 +38,6 @@ func HandleLoginProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Django'dan dönen yanıtı (JWT veya hata mesajı) doğrudan istemciye (React) ilet
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)

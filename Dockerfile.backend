@@ -8,4 +8,6 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /backend-app /app/backend
 COPY --from=builder /app/configs /app/configs
+COPY --from=builder /app/.env /app/.env 
+
 CMD ["/app/backend"]

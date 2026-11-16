@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hardware-monitoring-control-platform/internal/client"
 	"hardware-monitoring-control-platform/internal/core"
+	"hardware-monitoring-control-platform/internal/pkg"
 	"time"
 )
 
@@ -24,6 +25,7 @@ func pollDevice(dev core.DeviceConfig, state *core.ServerState, done <-chan stru
 		c, err := client.ConnectWithRetry(dev.URL)
 		if err != nil {
 			fmt.Printf("[POLLER - %s] Bağlantı kurulamadı, 3 saniye sonra tekrar denenecek...\n", dev.Name)
+			pkg.LogAction("", "", "Bağlantı kurulamadı")
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -58,12 +60,6 @@ func pollDevice(dev core.DeviceConfig, state *core.ServerState, done <-chan stru
 					break
 				}
 
-				temp := float64(regs[0]) / 100.0
-				var hum float64
-				if len(regs) > 1 {
-					hum = float64(regs[1]) / 100.0
-				}
-
 				state.DataMu.Lock()
 				if state.DeviceSensors[dev.ID] == nil {
 					state.DeviceSensors[dev.ID] = make(map[uint16]float64)
@@ -75,9 +71,6 @@ func pollDevice(dev core.DeviceConfig, state *core.ServerState, done <-chan stru
 					}
 				}
 				state.DataMu.Unlock()
-
-				fmt.Printf("\r[%s] [%s] Sıcaklık: %.2f °C | Nem: %.2f %%\n> ",
-					time.Now().Format("15:04:05"), dev.Name, temp, hum)
 			}
 		}
 		ticker.Stop()

@@ -21,7 +21,7 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println(".env dosyası okunamadı!")
+		log.Println("Uyarı: .env dosyası bulunamadı, sistem ortam değişkenleri (environment variables) kullanılıyor.")
 	}
 
 	file, err := os.ReadFile("configs/config.json")

@@ -10,7 +10,6 @@ import (
 func HandleGetSensors(state *core.ServerState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		state.DataMu.RLock()
-		// race condition'ı önlemek için
 		sensorsCopy := make(map[int]map[uint16]float64)
 		for dID, sMap := range state.DeviceSensors {
 			sensorsCopy[dID] = make(map[uint16]float64)

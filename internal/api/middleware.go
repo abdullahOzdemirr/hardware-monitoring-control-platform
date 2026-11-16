@@ -84,7 +84,6 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		tokenStr := parts[1]
 
-		// Token'ı doğrula
 		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 			return JwtSecret, nil
 		})
@@ -94,11 +93,11 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Token geçerliyse bir sonraki handler'a devam et
 		next(w, r)
 	}
 }
 
+/*
 func RequirePermission(requiredPermission string, next http.HandlerFunc) http.HandlerFunc {
 	return AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -109,18 +108,33 @@ func RequirePermission(requiredPermission string, next http.HandlerFunc) http.Ha
 			return JwtSecret, nil
 		})
 
-		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			if isSuper, ok := claims["is_superuser"].(bool); ok && isSuper {
-				next(w, r)
-				return
-			}
+		// Token içerisinden kullanıcı adını da alalım (Loglama için gerekli)
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "Geçersiz Token Claims", http.StatusUnauthorized)
+			return
+		}
 
-			if perms, ok := claims["permissions"].([]interface{}); ok {
-				for _, p := range perms {
-					if pStr, ok := p.(string); ok && pStr == requiredPermission {
-						next(w, r)
-						return
-					}
+		username, _ := claims["username"].(string) // Token'daki kullanıcı adı alanı (anahtarı projene göre değişebilir)
+		if username == "" {
+			username = "BilinmeyenKullanici"
+		}
+
+		// 1. Durum: Süper kullanıcı kontrolü
+		if isSuper, ok := claims["is_superuser"].(bool); ok && isSuper {
+			pkg.LogAction(username, "RELAY_PERMISSION_GRANTED", fmt.Sprintf("Superuser yetkisiyle izin verildi. Gerekli: %s", requiredPermission))
+			next(w, r)
+			return
+		}
+
+		// 2. Durum: İzin listesi kontrolü
+		if perms, ok := claims["permissions"].([]interface{}); ok {
+			for _, p := range perms {
+				if pStr, ok := p.(string); ok && pStr == requiredPermission {
+					pkg.LogAction(username, "RELAY_PERMISSION_GRANTED", fmt.Sprintf("İzin eşleşti: %s", requiredPermission))
+
+					next(w, r)
+					return
 				}
 			}
 		}
@@ -128,3 +142,4 @@ func RequirePermission(requiredPermission string, next http.HandlerFunc) http.Ha
 		http.Error(w, "Bu röleyi değiştirmek için yetkiniz yok (Forbidden)", http.StatusForbidden)
 	})
 }
+*/
